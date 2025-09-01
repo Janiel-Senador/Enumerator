@@ -1,0 +1,127 @@
+@import "tailwindcss";
+
+:root {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Helvetica Neue', Arial, sans-serif;
+  line-height: 1.5;
+  font-weight: 400;
+  color-scheme: light dark;
+  
+  /* Enhanced font rendering for all platforms */
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  -webkit-text-size-adjust: 100%; /* Prevents iOS text scaling */
+  text-size-adjust: 100%;
+}
+
+/* Reset and mobile optimization */
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  padding: 0;
+  min-height: 100vh;
+  min-height: 100dvh; /* Dynamic viewport height for mobile */
+  width: 100%;
+  overflow-x: hidden; /* Prevent horizontal scroll */
+  
+  /* Touch optimization for mobile */
+  -webkit-overflow-scrolling: touch;
+  touch-action: manipulation; /* Improves touch responsiveness */
+}
+
+/* Improved input styling for cross-platform compatibility */
+input {
+  /* Remove iOS styling */
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  appearance: none;
+  
+  /* Prevent zoom on iOS when focusing inputs */
+  font-size: 16px;
+  
+  /* Enhanced touch targets */
+  min-height: 44px; /* iOS recommended touch target */
+}
+
+button {
+  /* Remove default styling */
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  appearance: none;
+  border: none;
+  background: none;
+  
+  /* Enhanced touch targets */
+  min-height: 44px; /* iOS recommended touch target */
+  min-width: 44px;
+  
+  /* Touch optimization */
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent; /* Remove iOS tap highlight */
+}
+
+/* Focus styles for accessibility and keyboard navigation */
+input:focus,
+button:focus {
+  outline: 2px solid #8B5CF6;
+  outline-offset: 2px;
+}
+
+/* High contrast mode support */
+@media (prefers-contrast: high) {
+  :root {
+    --tw-bg-opacity: 1;
+  }
+}
+
+/* Reduced motion for accessibility */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+/* Mobile-specific optimizations */
+@media (max-width: 768px) {
+  :root {
+    font-size: 14px; /* Slightly smaller base font for mobile */
+  }
+}
+
+/* Prevent text selection on UI elements (but allow on input) */
+.select-none {
+  -webkit-user-select: none;
+  -moz-user-select: none;
+  user-select: none;
+}
+
+/* Smooth scrolling */
+html {
+  scroll-behavior: smooth;
+}
+
+/* Custom scrollbar for webkit browsers */
+::-webkit-scrollbar {
+  width: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: rgba(255, 255, 255, 0.1);
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.3);
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.5);
+}
