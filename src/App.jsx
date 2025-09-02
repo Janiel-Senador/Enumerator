@@ -83,6 +83,8 @@ const HiraganaEnumerator = () => {
   const [currentQuestionNumber, setCurrentQuestionNumber] = useState(0);
   const [gameCompleted, setGameCompleted] = useState(false);
   const [finalScore, setFinalScore] = useState(0);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [cooldownActive, setCooldownActive] = useState(false);
 
   // Generate new random character (no repeats)
   const generateNewCharacter = useCallback(() => {
@@ -92,6 +94,8 @@ const HiraganaEnumerator = () => {
       setGameCompleted(true);
       setIsActive(false);
       setFinalScore(score);
+      setCooldownActive(false);
+      setIsSubmitting(false);
       return;
     }
 
@@ -115,19 +119,26 @@ const HiraganaEnumerator = () => {
   // Timer effect
   useEffect(() => {
     let interval = null;
-    if (isActive && timeLeft > 0 && gameStarted) {
+    if (isActive && timeLeft > 0 && gameStarted && !cooldownActive) {
       interval = setInterval(() => {
         setTimeLeft(timeLeft - 1);
       }, 1000);
-    } else if (timeLeft === 0 && gameStarted) {
+    } else if (timeLeft === 0 && gameStarted && !cooldownActive) {
       handleSubmit(true);
     }
     return () => clearInterval(interval);
-  }, [isActive, timeLeft, gameStarted]);
+  }, [isActive, timeLeft, gameStarted, cooldownActive]);
 
-  // Handle answer submission
-  const handleSubmit = (timeUp = false) => {
-    if (!currentCharacter) return;
+  // Handle answer submission with cooldown protection
+  const handleSubmit = useCallback((timeUp = false) => {
+    // Prevent multiple submissions
+    if (!currentCharacter || isSubmitting || cooldownActive) return;
+    
+    // Prevent submission if input is empty and it's not a timeout
+    if (!timeUp && !userInput.trim()) return;
+
+    setIsSubmitting(true);
+    setCooldownActive(true);
 
     const isCorrect = userInput.toLowerCase().trim() === currentCharacter.romaji;
     
@@ -136,17 +147,24 @@ const HiraganaEnumerator = () => {
       setStreak(0);
     } else if (isCorrect) {
       setFeedback('🎉 Correct!');
-      setScore(score + 1);
-      setStreak(streak + 1);
+      setScore(prevScore => prevScore + 1);
+      setStreak(prevStreak => prevStreak + 1);
     } else {
       setFeedback(`❌ Incorrect. The answer was "${currentCharacter.romaji}"`);
       setStreak(0);
     }
 
+    // Show feedback for 1.5 seconds, then move to next question
     setTimeout(() => {
+      setIsSubmitting(false);
       generateNewCharacter();
+      
+      // Additional 1 second cooldown after new question loads
+      setTimeout(() => {
+        setCooldownActive(false);
+      }, 1000);
     }, 1500);
-  };
+  }, [currentCharacter, userInput, isSubmitting, cooldownActive]);
 
   // Start game
   const startGame = () => {
@@ -158,6 +176,8 @@ const HiraganaEnumerator = () => {
     setCurrentQuestionNumber(0);
     setGameCompleted(false);
     setFinalScore(0);
+    setIsSubmitting(false);
+    setCooldownActive(false);
     generateNewCharacter();
   };
 
@@ -170,11 +190,15 @@ const HiraganaEnumerator = () => {
     setUsedCharacters([]);
     setCurrentQuestionNumber(0);
     setGameCompleted(false);
+    setIsSubmitting(false);
+    setCooldownActive(false);
   };
 
   // Handle input change
   const handleInputChange = (e) => {
-    setUserInput(e.target.value);
+    if (!cooldownActive && !isSubmitting) {
+      setUserInput(e.target.value);
+    }
   };
 
 
@@ -258,16 +282,27 @@ const HiraganaEnumerator = () => {
               {/* Timer */}
               <div className="text-center mb-4 sm:mb-6">
                 <div className="inline-block bg-white/20 rounded-full px-3 sm:px-4 py-2">
-                  <span className="text-lg sm:text-2xl font-bold text-white">
-                    ⏱️ {timeLeft}s
+                  <span className={`text-lg sm:text-2xl font-bold transition-colors duration-200 ${
+                    cooldownActive ? 'text-yellow-300' : 'text-white'
+                  }`}>
+                    {cooldownActive ? '⏸️' : '⏱️'} {timeLeft}s
                   </span>
                 </div>
                 <div className="w-full bg-white/20 rounded-full h-2 mt-3">
                   <div 
-                    className="bg-gradient-to-r from-green-400 to-yellow-400 h-2 rounded-full transition-all duration-1000"
+                    className={`h-2 rounded-full transition-all duration-1000 ${
+                      cooldownActive 
+                        ? 'bg-gradient-to-r from-yellow-400 to-orange-400' 
+                        : 'bg-gradient-to-r from-green-400 to-yellow-400'
+                    }`}
                     style={{ width: `${(timeLeft / timeLimit) * 100}%` }}
                   ></div>
                 </div>
+                {cooldownActive && (
+                  <div className="text-sm text-yellow-300 mt-2 font-medium">
+                    Cooldown active - please wait
+                  </div>
+                )}
               </div>
 
               {/* Character Display */}
@@ -286,11 +321,20 @@ const HiraganaEnumerator = () => {
                     type="text"
                     value={userInput}
                     onChange={handleInputChange}
-                    onKeyPress={(e) => e.key === 'Enter' && userInput.trim() && handleSubmit()}
-                    placeholder="Enter romaji..."
-                    className="w-full max-w-md mx-auto bg-white/20 text-white text-lg sm:text-xl px-4 sm:px-6 py-3 sm:py-4 rounded-xl border border-white/30 focus:outline-none focus:ring-4 focus:ring-purple-400/50 placeholder-white/60 text-center min-h-[44px]"
+                    onKeyPress={(e) => {
+                      if (e.key === 'Enter' && !cooldownActive && !isSubmitting && userInput.trim()) {
+                        e.preventDefault();
+                        handleSubmit();
+                      }
+                    }}
+                    placeholder={cooldownActive ? "Please wait..." : "Enter romaji..."}
+                    className={`w-full max-w-md mx-auto text-white text-lg sm:text-xl px-4 sm:px-6 py-3 sm:py-4 rounded-xl border focus:outline-none focus:ring-4 text-center min-h-[44px] transition-all duration-200 ${
+                      cooldownActive || isSubmitting
+                        ? 'bg-gray-600/40 border-gray-500/50 cursor-not-allowed placeholder-gray-400'
+                        : 'bg-white/20 border-white/30 focus:ring-purple-400/50 placeholder-white/60'
+                    }`}
                     autoFocus
-                    disabled={!isActive}
+                    disabled={!isActive || cooldownActive || isSubmitting}
                     autoComplete="off"
                     autoCorrect="off"
                     autoCapitalize="off"
@@ -301,10 +345,23 @@ const HiraganaEnumerator = () => {
                 <div className="text-center">
                   <button
                     onClick={() => handleSubmit()}
-                    disabled={!userInput.trim() || !isActive}
-                    className="bg-purple-500 hover:bg-purple-600 active:bg-purple-700 disabled:bg-gray-500 disabled:cursor-not-allowed text-white px-6 sm:px-8 py-3 rounded-xl font-bold text-base sm:text-lg transition-all duration-200 transform hover:scale-105 active:scale-95 disabled:hover:scale-100 min-h-[44px] min-w-[100px]"
+                    disabled={!userInput.trim() || !isActive || cooldownActive || isSubmitting}
+                    className={`text-white px-6 sm:px-8 py-3 rounded-xl font-bold text-base sm:text-lg transition-all duration-200 transform min-h-[44px] min-w-[100px] ${
+                      !userInput.trim() || !isActive || cooldownActive || isSubmitting
+                        ? 'bg-gray-500 cursor-not-allowed opacity-50'
+                        : 'bg-purple-500 hover:bg-purple-600 active:bg-purple-700 hover:scale-105 active:scale-95'
+                    }`}
                   >
-                    Submit
+                    {isSubmitting ? (
+                      <div className="flex items-center justify-center gap-2">
+                        <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
+                        <span>Processing...</span>
+                      </div>
+                    ) : cooldownActive ? (
+                      'Wait...'
+                    ) : (
+                      'Submit'
+                    )}
                   </button>
                 </div>
               </div>
