@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 
 // Hiragana characters with their romanized equivalents
 const hiraganaData = [
@@ -22,47 +22,304 @@ const hiraganaData = [
   { hiragana: 'わ', romaji: 'wa' }, { hiragana: 'を', romaji: 'wo' }, { hiragana: 'ん', romaji: 'n' }
 ];
 
-// Floating particles component for interactive background
-const FloatingParticles = () => {
-  const [particles, setParticles] = useState([]);
+// Japanese Interactive Background Component
+const JapaneseInteractiveBackground = () => {
+  const [mousePos, setMousePos] = useState({ x: 400, y: 300 });
+  const [sakura, setSakura] = useState([]);
+  const [ripples, setRipples] = useState([]);
+  const [time, setTime] = useState(0);
+  const [isClicked, setIsClicked] = useState(false);
+  const containerRef = useRef(null);
 
+  // Initialize sakura petals
   useEffect(() => {
-    const newParticles = Array.from({ length: 15 }, (_, i) => ({
-      id: i,
-      x: Math.random() * 100,
-      y: Math.random() * 100,
-      char: hiraganaData[Math.floor(Math.random() * hiraganaData.length)].hiragana,
-      speed: 0.1 + Math.random() * 0.2,
-      direction: Math.random() * Math.PI * 2
-    }));
-    setParticles(newParticles);
+    const initialSakura = [];
+    for (let i = 0; i < 60; i++) {
+      initialSakura.push({
+        id: i,
+        x: Math.random() * 1200,
+        y: Math.random() * 800 - 200,
+        size: Math.random() * 10 + 3,
+        rotation: Math.random() * 360,
+        speed: Math.random() * 0.4 + 0.1,
+        sway: Math.random() * 1.5 - 0.75,
+        opacity: Math.random() * 0.6 + 0.2,
+      });
+    }
+    setSakura(initialSakura);
   }, []);
 
+  // Animation loop
   useEffect(() => {
-    const interval = setInterval(() => {
-      setParticles(prev => prev.map(particle => ({
-        ...particle,
-        x: (particle.x + Math.cos(particle.direction) * particle.speed + 100) % 100,
-        y: (particle.y + Math.sin(particle.direction) * particle.speed + 100) % 100
+    const animate = () => {
+      setTime(prev => prev + 1);
+      
+      setSakura(prev => prev.map(petal => {
+        let newX = petal.x + Math.sin(time * 0.008 + petal.id) * petal.sway;
+        let newY = petal.y + petal.speed;
+        let newRotation = petal.rotation + 0.8;
+        
+        // Reset position when off screen
+        if (newY > 700) {
+          newY = -50;
+          newX = Math.random() * 1200;
+        }
+        
+        // Mouse interaction - petals avoid cursor gently
+        const distance = Math.sqrt((newX - mousePos.x) ** 2 + (newY - mousePos.y) ** 2);
+        if (distance < 60) {
+          const angle = Math.atan2(newY - mousePos.y, newX - mousePos.x);
+          newX += Math.cos(angle) * 1.5;
+          newY += Math.sin(angle) * 1.5;
+        }
+        
+        return {
+          ...petal,
+          x: newX,
+          y: newY,
+          rotation: newRotation,
+        };
+      }));
+
+      // Update ripples
+      setRipples(prev => prev.filter(ripple => ripple.age < 50).map(ripple => ({
+        ...ripple,
+        age: ripple.age + 1,
+        size: ripple.size + 6,
+        opacity: Math.max(0, 0.6 - ripple.age / 50),
       })));
-    }, 50);
+    };
 
+    const interval = setInterval(animate, 50);
     return () => clearInterval(interval);
-  }, []);
+  }, [mousePos, time]);
+
+  // Mouse tracking
+  const handleMouseMove = (e) => {
+    const rect = e.currentTarget.getBoundingClientRect();
+    setMousePos({
+      x: e.clientX - rect.left,
+      y: e.clientY - rect.top,
+    });
+  };
+
+  // Click handler for ripple effects
+  const handleClick = (e) => {
+    const rect = e.currentTarget.getBoundingClientRect();
+    const clickX = e.clientX - rect.left;
+    const clickY = e.clientY - rect.top;
+    
+    setRipples(prev => [...prev, {
+      id: Date.now(),
+      x: clickX,
+      y: clickY,
+      size: 0,
+      age: 0,
+      opacity: 0.6,
+    }]);
+    
+    setIsClicked(true);
+    setTimeout(() => setIsClicked(false), 150);
+  };
 
   return (
-    <div className="fixed inset-0 pointer-events-none overflow-hidden">
-      {particles.map(particle => (
+    <div 
+      ref={containerRef}
+      className="fixed inset-0 overflow-hidden pointer-events-none"
+      onMouseMove={handleMouseMove}
+      onClick={handleClick}
+      style={{
+        background: `linear-gradient(135deg, 
+          #0f0f23 0%, 
+          #1a1a2e 25%, 
+          #16213e 50%, 
+          #0f3460 75%, 
+          #533483 100%
+        )`,
+        pointerEvents: 'none',
+      }}
+    >
+      {/* Animated mountain silhouette */}
+      <div className="absolute bottom-0 w-full opacity-15">
+        <svg viewBox="0 0 1200 300" className="w-full h-80">
+          <path
+            d="M0,300 L0,200 Q200,50 400,120 Q600,20 800,90 Q1000,40 1200,110 L1200,300 Z"
+            fill="url(#mountainGrad)"
+          />
+          <defs>
+            <linearGradient id="mountainGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+              <stop offset="0%" stopColor="#2d1b69" stopOpacity="0.8"/>
+              <stop offset="100%" stopColor="#1a0b3d" stopOpacity="0.9"/>
+            </linearGradient>
+          </defs>
+        </svg>
+      </div>
+
+      {/* Floating moon */}
+      <div 
+        className="absolute rounded-full opacity-60"
+        style={{
+          top: '8%',
+          right: '15%',
+          width: '100px',
+          height: '100px',
+          background: `radial-gradient(circle at 30% 30%, 
+            #ffeaa7, 
+            #fdcb6e, 
+            #e17055
+          )`,
+          boxShadow: '0 0 60px rgba(255, 234, 167, 0.3)',
+          transform: `translateY(${Math.sin(time * 0.015) * 8}px)`,
+        }}
+      />
+
+      {/* Bamboo stems */}
+      {[...Array(5)].map((_, i) => (
         <div
-          key={particle.id}
-          className="absolute text-4xl text-purple-200/20 font-bold transition-all duration-1000"
+          key={`bamboo-${i}`}
+          className="absolute opacity-8"
           style={{
-            left: `${particle.x}%`,
-            top: `${particle.y}%`,
-            transform: 'translate(-50%, -50%)'
+            left: `${15 + i * 18}%`,
+            bottom: '0',
+            width: '3px',
+            height: `${250 + Math.sin(time * 0.008 + i) * 40}px`,
+            background: `linear-gradient(to top, 
+              #27ae60, 
+              #2ecc71, 
+              #58d68d
+            )`,
+            transform: `rotate(${Math.sin(time * 0.004 + i) * 2}deg)`,
+            transformOrigin: 'bottom center',
+          }}
+        />
+      ))}
+
+      {/* Floating kanji characters (more subtle) */}
+      {['美', '愛', '和', '心', '夢', '桜', '月', '星'].map((char, i) => (
+        <div
+          key={`kanji-${i}`}
+          className="absolute text-2xl font-bold opacity-3 pointer-events-none select-none"
+          style={{
+            left: `${15 + i * 12}%`,
+            top: `${25 + Math.sin(time * 0.006 + i) * 25}%`,
+            color: '#74b9ff',
+            transform: `rotate(${Math.sin(time * 0.008 + i) * 10}deg) scale(${1 + Math.sin(time * 0.01 + i) * 0.15})`,
+            fontFamily: 'serif',
           }}
         >
-          {particle.char}
+          {char}
+        </div>
+      ))}
+
+      {/* Sakura petals */}
+      {sakura.map((petal) => (
+        <div
+          key={petal.id}
+          className="absolute pointer-events-none"
+          style={{
+            left: petal.x,
+            top: petal.y,
+            width: petal.size,
+            height: petal.size,
+            opacity: petal.opacity,
+            transform: `rotate(${petal.rotation}deg)`,
+          }}
+        >
+          <div
+            className="w-full h-full rounded-full"
+            style={{
+              background: `radial-gradient(ellipse 70% 100% at 50% 0%, 
+                #ff7675, 
+                #fd79a8, 
+                transparent 70%
+              )`,
+              clipPath: 'polygon(50% 0%, 80% 35%, 100% 70%, 50% 100%, 0% 70%, 20% 35%)',
+            }}
+          />
+        </div>
+      ))}
+
+      {/* Water ripples on click */}
+      {ripples.map((ripple) => (
+        <div
+          key={ripple.id}
+          className="absolute pointer-events-none rounded-full border-2"
+          style={{
+            left: ripple.x - ripple.size / 2,
+            top: ripple.y - ripple.size / 2,
+            width: ripple.size,
+            height: ripple.size,
+            borderColor: `rgba(116, 185, 255, ${ripple.opacity})`,
+            background: `radial-gradient(circle, 
+              rgba(116, 185, 255, ${ripple.opacity * 0.1}) 0%, 
+              transparent 70%
+            )`,
+          }}
+        />
+      ))}
+
+      {/* Mouse cursor glow */}
+      <div
+        className="absolute pointer-events-none rounded-full mix-blend-screen"
+        style={{
+          left: mousePos.x - 30,
+          top: mousePos.y - 30,
+          width: '60px',
+          height: '60px',
+          background: `radial-gradient(circle,
+            rgba(116, 185, 255, 0.2),
+            rgba(255, 118, 117, 0.1),
+            transparent
+          )`,
+          filter: 'blur(8px)',
+          transform: `scale(${isClicked ? 1.3 : 1})`,
+          transition: 'transform 0.15s ease',
+        }}
+      />
+
+      {/* Floating lanterns (more subtle) */}
+      {[...Array(2)].map((_, i) => (
+        <div
+          key={`lantern-${i}`}
+          className="absolute opacity-40"
+          style={{
+            left: `${75 + i * 8}%`,
+            top: `${35 + Math.sin(time * 0.008 + i * 2) * 15}%`,
+            transform: `scale(${0.7 + Math.sin(time * 0.015 + i) * 0.15})`,
+          }}
+        >
+          {/* Lantern body */}
+          <div
+            className="w-10 h-14 rounded-lg relative"
+            style={{
+              background: `linear-gradient(45deg, 
+                #fd79a8, 
+                #fdcb6e, 
+                #ff7675
+              )`,
+              boxShadow: '0 0 15px rgba(253, 121, 168, 0.3)',
+            }}
+          >
+            {/* Lantern glow */}
+            <div
+              className="absolute inset-1 rounded-lg opacity-70"
+              style={{
+                background: `radial-gradient(ellipse 80% 60% at 50% 40%, 
+                  rgba(255, 255, 255, 0.6), 
+                  transparent 70%
+                )`,
+              }}
+            />
+            {/* Lantern string */}
+            <div
+              className="absolute w-0.5 h-6 bg-gray-600 opacity-30"
+              style={{
+                top: '-24px',
+                left: '50%',
+                transform: 'translateX(-50%)',
+              }}
+            />
+          </div>
         </div>
       ))}
     </div>
@@ -226,13 +483,11 @@ const HiraganaEnumerator = () => {
     }
   };
 
-
-
   return (
-    <div className="min-h-screen min-h-[100dvh] bg-gradient-to-br from-purple-900 via-blue-900 to-indigo-900 relative overflow-hidden">
-      <FloatingParticles />
+    <div className="min-h-screen min-h-[100dvh] relative overflow-hidden">
+      <JapaneseInteractiveBackground />
       
-      <div className="relative z-10 container mx-auto px-4 py-4 sm:py-8">
+      <div className="relative z-10 container mx-auto px-4 py-4 sm:py-8" style={{ pointerEvents: 'auto' }}>
         <div className="max-w-2xl mx-auto">
           {/* Header */}
           <div className="text-center mb-6 sm:mb-8">
@@ -245,7 +500,7 @@ const HiraganaEnumerator = () => {
           </div>
 
           {/* Game Mode Selection & Controls */}
-          <div className="bg-white/10 backdrop-blur-lg rounded-2xl p-4 sm:p-6 mb-4 sm:mb-6 border border-white/20">
+          <div className="bg-white/15 backdrop-blur-lg rounded-2xl p-4 sm:p-6 mb-4 sm:mb-6 border border-white/30 shadow-2xl">
             {/* Game Mode Selector */}
             {!gameStarted && (
               <div className="flex flex-col sm:flex-row items-center justify-center gap-4 mb-4 pb-4 border-b border-white/20">
@@ -255,7 +510,7 @@ const HiraganaEnumerator = () => {
                     onClick={() => setGameMode('jpToEn')}
                     className={`px-4 py-2 rounded-lg font-medium text-sm sm:text-base transition-all duration-200 min-h-[44px] ${
                       gameMode === 'jpToEn' 
-                        ? 'bg-purple-500 text-white' 
+                        ? 'bg-purple-500 text-white shadow-lg' 
                         : 'bg-white/20 text-purple-200 hover:bg-white/30'
                     }`}
                   >
@@ -265,7 +520,7 @@ const HiraganaEnumerator = () => {
                     onClick={() => setGameMode('enToJp')}
                     className={`px-4 py-2 rounded-lg font-medium text-sm sm:text-base transition-all duration-200 min-h-[44px] ${
                       gameMode === 'enToJp' 
-                        ? 'bg-purple-500 text-white' 
+                        ? 'bg-purple-500 text-white shadow-lg' 
                         : 'bg-white/20 text-purple-200 hover:bg-white/30'
                     }`}
                   >
@@ -296,14 +551,14 @@ const HiraganaEnumerator = () => {
                 {!gameStarted ? (
                   <button
                     onClick={startGame}
-                    className="start-button game-control-button text-white px-4 sm:px-6 py-2 sm:py-3 rounded-lg font-bold transition-all duration-200 transform text-sm sm:text-base min-h-[44px]"
+                    className="bg-gradient-to-r from-green-500 to-emerald-500 hover:from-green-600 hover:to-emerald-600 text-white px-4 sm:px-6 py-2 sm:py-3 rounded-lg font-bold transition-all duration-200 transform hover:scale-105 shadow-lg text-sm sm:text-base min-h-[44px]"
                   >
                     Start Game
                   </button>
                 ) : (
                   <button
                     onClick={stopGame}
-                    className="stop-button game-control-button text-white px-4 sm:px-6 py-2 sm:py-3 rounded-lg font-bold transition-all duration-200 transform text-sm sm:text-base min-h-[44px]"
+                    className="bg-gradient-to-r from-red-500 to-pink-500 hover:from-red-600 hover:to-pink-600 text-white px-4 sm:px-6 py-2 sm:py-3 rounded-lg font-bold transition-all duration-200 transform hover:scale-105 shadow-lg text-sm sm:text-base min-h-[44px]"
                   >
                     Stop Game
                   </button>
@@ -332,12 +587,12 @@ const HiraganaEnumerator = () => {
 
           {/* Game Area */}
           {gameStarted && !gameCompleted && currentCharacter && (
-            <div className="bg-white/15 backdrop-blur-lg rounded-2xl p-4 sm:p-8 border border-white/20">
+            <div className="bg-white/20 backdrop-blur-lg rounded-2xl p-4 sm:p-8 border border-white/30 shadow-2xl">
               {/* Timer / Feedback Area */}
               <div className="text-center mb-4 sm:mb-6">
                 {feedback ? (
                   // Show feedback in place of timer
-                  <div className="inline-block bg-white/20 rounded-full px-4 sm:px-6 py-3">
+                  <div className="inline-block bg-white/25 rounded-full px-4 sm:px-6 py-3 shadow-lg">
                     <span className="text-lg sm:text-2xl font-bold text-white">
                       {feedback}
                     </span>
@@ -345,7 +600,7 @@ const HiraganaEnumerator = () => {
                 ) : (
                   // Show timer when no feedback
                   <>
-                    <div className="inline-block bg-white/20 rounded-full px-3 sm:px-4 py-2">
+                    <div className="inline-block bg-white/25 rounded-full px-3 sm:px-4 py-2 shadow-lg">
                       <span className={`text-lg sm:text-2xl font-bold transition-colors duration-200 ${
                         cooldownActive ? 'text-yellow-300' : 'text-white'
                       }`}>
@@ -368,7 +623,7 @@ const HiraganaEnumerator = () => {
 
               {/* Character Display */}
               <div className="text-center mb-6 sm:mb-8">
-                <div className="inline-block bg-white/20 rounded-3xl p-6 sm:p-8 border-2 border-white/30">
+                <div className="inline-block bg-white/25 rounded-3xl p-6 sm:p-8 border-2 border-white/40 shadow-2xl">
                   <div className="text-6xl sm:text-7xl lg:text-8xl font-bold text-white drop-shadow-lg">
                     {gameMode === 'jpToEn' ? currentCharacter.hiragana : currentCharacter.romaji}
                   </div>
@@ -402,10 +657,10 @@ const HiraganaEnumerator = () => {
                           ? "Enter romaji (e.g., ka)..." 
                           : "Enter hiragana (e.g., か)..."
                     }
-                    className={`w-full max-w-md mx-auto text-white text-lg sm:text-xl px-4 sm:px-6 py-3 sm:py-4 rounded-xl border focus:outline-none focus:ring-4 text-center min-h-[44px] transition-all duration-200 ${
+                    className={`w-full max-w-md mx-auto text-white text-lg sm:text-xl px-4 sm:px-6 py-3 sm:py-4 rounded-xl border focus:outline-none focus:ring-4 text-center min-h-[44px] transition-all duration-200 shadow-lg ${
                       cooldownActive || isSubmitting
                         ? 'bg-gray-600/40 border-gray-500/50 cursor-not-allowed placeholder-gray-400'
-                        : 'bg-white/20 border-white/30 focus:ring-purple-400/50 placeholder-white/60'
+                        : 'bg-white/25 border-white/40 focus:ring-purple-400/50 placeholder-white/60'
                     }`}
                     autoFocus
                     disabled={!isActive || cooldownActive || isSubmitting}
@@ -438,7 +693,7 @@ const HiraganaEnumerator = () => {
                   <button
                     onClick={() => handleSubmit()}
                     disabled={!userInput.trim() || !isActive || cooldownActive || isSubmitting}
-                    className={`submit-button text-white px-6 sm:px-8 py-3 rounded-xl font-bold text-base sm:text-lg transition-all duration-200 transform min-h-[44px] min-w-[100px]`}
+                    className={`bg-gradient-to-r from-blue-500 to-purple-500 hover:from-blue-600 hover:to-purple-600 disabled:from-gray-500 disabled:to-gray-600 disabled:cursor-not-allowed text-white px-6 sm:px-8 py-3 rounded-xl font-bold text-base sm:text-lg transition-all duration-200 transform hover:scale-105 disabled:hover:scale-100 shadow-lg min-h-[44px] min-w-[100px]`}
                   >
                     {isSubmitting ? (
                       <div className="flex items-center justify-center gap-2">
@@ -458,7 +713,7 @@ const HiraganaEnumerator = () => {
 
           {/* Game Completed Screen */}
           {gameCompleted && (
-            <div className="bg-white/15 backdrop-blur-lg rounded-2xl p-4 sm:p-8 border border-white/20 text-center">
+            <div className="bg-white/20 backdrop-blur-lg rounded-2xl p-4 sm:p-8 border border-white/30 text-center shadow-2xl">
               <div className="text-4xl sm:text-6xl mb-4 sm:mb-6">🎉</div>
               <h2 className="text-2xl sm:text-3xl lg:text-4xl font-bold text-white mb-2 sm:mb-4">
                 Game Complete!
@@ -468,7 +723,7 @@ const HiraganaEnumerator = () => {
               </div>
               
               {/* Final Stats */}
-              <div className="bg-white/10 rounded-xl p-4 sm:p-6 mb-4 sm:mb-6">
+              <div className="bg-white/15 rounded-xl p-4 sm:p-6 mb-4 sm:mb-6 shadow-lg">
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 text-center">
                   <div>
                     <div className="text-2xl sm:text-3xl font-bold text-yellow-300">{finalScore}</div>
@@ -506,7 +761,7 @@ const HiraganaEnumerator = () => {
 
               <button
                 onClick={startGame}
-                className="start-button game-control-button text-white px-6 sm:px-8 py-3 rounded-xl font-bold text-base sm:text-lg transition-all duration-200 transform min-h-[44px]"
+                className="bg-gradient-to-r from-green-500 to-emerald-500 hover:from-green-600 hover:to-emerald-600 text-white px-6 sm:px-8 py-3 rounded-xl font-bold text-base sm:text-lg transition-all duration-200 transform hover:scale-105 shadow-lg min-h-[44px]"
               >
                 Play Again
               </button>
@@ -515,7 +770,7 @@ const HiraganaEnumerator = () => {
 
           {/* Welcome Screen */}
           {!gameStarted && !gameCompleted && (
-            <div className="bg-white/15 backdrop-blur-lg rounded-2xl p-4 sm:p-8 border border-white/20 text-center">
+            <div className="bg-white/20 backdrop-blur-lg rounded-2xl p-4 sm:p-8 border border-white/30 text-center shadow-2xl">
               <div className="text-4xl sm:text-6xl mb-4 sm:mb-6">🎌</div>
               <h2 className="text-2xl sm:text-3xl font-bold text-white mb-2 sm:mb-4">
                 Welcome to Hiragana Practice!
@@ -523,14 +778,14 @@ const HiraganaEnumerator = () => {
               <p className="text-base sm:text-lg text-purple-200 mb-4 sm:mb-6">
                 Test your knowledge of all {hiraganaData.length} hiragana characters in both directions! Each character will appear exactly once.
               </p>
-              <div className="bg-white/10 rounded-xl p-4 mb-4">
+              <div className="bg-white/15 rounded-xl p-4 mb-4 shadow-lg">
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-center">
-                  <div className="p-3 bg-white/10 rounded-lg">
+                  <div className="p-3 bg-white/15 rounded-lg shadow-md">
                     <div className="text-2xl mb-2">🇯🇵 → 🇬🇧</div>
                     <div className="text-sm text-purple-200">See hiragana, type romaji</div>
                     <div className="text-xs text-purple-300 mt-1">Example: か → ka</div>
                   </div>
-                  <div className="p-3 bg-white/10 rounded-lg">
+                  <div className="p-3 bg-white/15 rounded-lg shadow-md">
                     <div className="text-2xl mb-2">🇬🇧 → 🇯🇵</div>
                     <div className="text-sm text-purple-200">See romaji, type hiragana</div>
                     <div className="text-xs text-purple-300 mt-1">Example: ka → か</div>
@@ -539,7 +794,7 @@ const HiraganaEnumerator = () => {
               </div>
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 mb-4 sm:mb-6">
                 {hiraganaData.slice(0, 8).map((char, index) => (
-                  <div key={index} className="bg-white/10 rounded-lg p-2 sm:p-3 text-center">
+                  <div key={index} className="bg-white/15 rounded-lg p-2 sm:p-3 text-center shadow-md">
                     <div className="text-xl sm:text-2xl font-bold text-white">{char.hiragana}</div>
                     <div className="text-xs sm:text-sm text-purple-200">{char.romaji}</div>
                   </div>
@@ -552,7 +807,7 @@ const HiraganaEnumerator = () => {
           )}
 
           {/* Instructions */}
-          <div className="mt-6 sm:mt-8 bg-white/10 backdrop-blur-lg rounded-xl p-4 sm:p-6 border border-white/20">
+          <div className="mt-6 sm:mt-8 bg-white/15 backdrop-blur-lg rounded-xl p-4 sm:p-6 border border-white/30 shadow-lg">
             <h3 className="text-lg sm:text-xl font-bold text-white mb-3">How to Play:</h3>
             <ul className="text-sm sm:text-base text-purple-200 space-y-2">
               <li>• Choose your game mode: Japanese to English or English to Japanese</li>
@@ -562,34 +817,15 @@ const HiraganaEnumerator = () => {
               <li>• Complete all {hiraganaData.length} characters to finish the game!</li>
             </ul>
           </div>
+          
+          {/* Background interaction note */}
+          <div className="mt-4 text-center">
+            <p className="text-xs text-purple-300 opacity-60">
+              Move your mouse around and click to interact with the background ✨
+            </p>
+          </div>
         </div>
       </div>
-
-      {/* Interactive click effects */}
-      <style jsx>{`
-        .container {
-          cursor: pointer;
-        }
-        
-        @keyframes ripple {
-          0% {
-            transform: scale(0);
-            opacity: 1;
-          }
-          100% {
-            transform: scale(4);
-            opacity: 0;
-          }
-        }
-        
-        .ripple {
-          position: absolute;
-          border-radius: 50%;
-          background: rgba(255, 255, 255, 0.3);
-          animation: ripple 0.6s linear;
-          pointer-events: none;
-        }
-      `}</style>
     </div>
   );
 };
