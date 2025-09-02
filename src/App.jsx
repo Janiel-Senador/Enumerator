@@ -85,6 +85,8 @@ const HiraganaEnumerator = () => {
   const [finalScore, setFinalScore] = useState(0);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [cooldownActive, setCooldownActive] = useState(false);
+  const [gameMode, setGameMode] = useState('jpToEn'); // 'jpToEn' or 'enToJp'
+  const [isJapaneseInput, setIsJapaneseInput] = useState(false);
 
   // Generate new random character (no repeats)
   const generateNewCharacter = useCallback(() => {
@@ -129,6 +131,13 @@ const HiraganaEnumerator = () => {
     return () => clearInterval(interval);
   }, [isActive, timeLeft, gameStarted, cooldownActive]);
 
+  // Detect Japanese input method
+  const detectJapaneseInput = useCallback((input) => {
+    const hasJapanese = /[\u3040-\u309F\u30A0-\u30FF\u4E00-\u9FAF]/.test(input);
+    setIsJapaneseInput(hasJapanese);
+    return hasJapanese;
+  }, []);
+
   // Handle answer submission with cooldown protection
   const handleSubmit = useCallback((timeUp = false) => {
     // Prevent multiple submissions
@@ -140,17 +149,27 @@ const HiraganaEnumerator = () => {
     setIsSubmitting(true);
     setCooldownActive(true);
 
-    const isCorrect = userInput.toLowerCase().trim() === currentCharacter.romaji;
+    let isCorrect = false;
+    
+    if (gameMode === 'jpToEn') {
+      // Japanese to English mode
+      isCorrect = userInput.toLowerCase().trim() === currentCharacter.romaji;
+    } else {
+      // English to Japanese mode
+      isCorrect = userInput.trim() === currentCharacter.hiragana;
+    }
     
     if (timeUp) {
-      setFeedback(`⏰ Time's up! The answer was "${currentCharacter.romaji}"`);
+      const correctAnswer = gameMode === 'jpToEn' ? currentCharacter.romaji : currentCharacter.hiragana;
+      setFeedback(`⏰ Time's up! The answer was "${correctAnswer}"`);
       setStreak(0);
     } else if (isCorrect) {
       setFeedback('🎉 Correct!');
       setScore(prevScore => prevScore + 1);
       setStreak(prevStreak => prevStreak + 1);
     } else {
-      setFeedback(`❌ Incorrect. The answer was "${currentCharacter.romaji}"`);
+      const correctAnswer = gameMode === 'jpToEn' ? currentCharacter.romaji : currentCharacter.hiragana;
+      setFeedback(`❌ Incorrect. The answer was "${correctAnswer}"`);
       setStreak(0);
     }
 
@@ -164,7 +183,7 @@ const HiraganaEnumerator = () => {
         setCooldownActive(false);
       }, 1000);
     }, 1500);
-  }, [currentCharacter, userInput, isSubmitting, cooldownActive]);
+  }, [currentCharacter, userInput, isSubmitting, cooldownActive, gameMode]);
 
   // Start game
   const startGame = () => {
@@ -197,7 +216,13 @@ const HiraganaEnumerator = () => {
   // Handle input change
   const handleInputChange = (e) => {
     if (!cooldownActive && !isSubmitting) {
-      setUserInput(e.target.value);
+      const value = e.target.value;
+      setUserInput(value);
+      
+      // Detect Japanese input for English to Japanese mode
+      if (gameMode === 'enToJp') {
+        detectJapaneseInput(value);
+      }
     }
   };
 
@@ -215,12 +240,41 @@ const HiraganaEnumerator = () => {
               ひらがな Enumerator
             </h1>
             <p className="text-lg sm:text-xl text-purple-200">
-              Test your hiragana knowledge!
+              {gameMode === 'jpToEn' ? 'Japanese to English' : 'English to Japanese'}
             </p>
           </div>
 
-          {/* Game Controls */}
+          {/* Game Mode Selection & Controls */}
           <div className="bg-white/10 backdrop-blur-lg rounded-2xl p-4 sm:p-6 mb-4 sm:mb-6 border border-white/20">
+            {/* Game Mode Selector */}
+            {!gameStarted && (
+              <div className="flex flex-col sm:flex-row items-center justify-center gap-4 mb-4 pb-4 border-b border-white/20">
+                <label className="text-white font-medium text-sm sm:text-base">Game Mode:</label>
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => setGameMode('jpToEn')}
+                    className={`px-4 py-2 rounded-lg font-medium text-sm sm:text-base transition-all duration-200 min-h-[44px] ${
+                      gameMode === 'jpToEn' 
+                        ? 'bg-purple-500 text-white' 
+                        : 'bg-white/20 text-purple-200 hover:bg-white/30'
+                    }`}
+                  >
+                    🇯🇵 → 🇬🇧 Japanese to English
+                  </button>
+                  <button
+                    onClick={() => setGameMode('enToJp')}
+                    className={`px-4 py-2 rounded-lg font-medium text-sm sm:text-base transition-all duration-200 min-h-[44px] ${
+                      gameMode === 'enToJp' 
+                        ? 'bg-purple-500 text-white' 
+                        : 'bg-white/20 text-purple-200 hover:bg-white/30'
+                    }`}
+                  >
+                    🇬🇧 → 🇯🇵 English to Japanese
+                  </button>
+                </div>
+              </div>
+            )}
+            
             <div className="flex flex-col sm:flex-row items-center justify-between gap-4 mb-4">
               <div className="flex flex-col sm:flex-row items-center gap-2 sm:gap-4">
                 <label className="text-white font-medium text-sm sm:text-base">Time Limit:</label>
@@ -316,8 +370,15 @@ const HiraganaEnumerator = () => {
               <div className="text-center mb-6 sm:mb-8">
                 <div className="inline-block bg-white/20 rounded-3xl p-6 sm:p-8 border-2 border-white/30">
                   <div className="text-6xl sm:text-7xl lg:text-8xl font-bold text-white drop-shadow-lg">
-                    {currentCharacter.hiragana}
+                    {gameMode === 'jpToEn' ? currentCharacter.hiragana : currentCharacter.romaji}
                   </div>
+                </div>
+                {/* Mode indicator */}
+                <div className="mt-4 text-sm sm:text-base text-purple-200">
+                  {gameMode === 'jpToEn' 
+                    ? 'Type the romanized version' 
+                    : 'Type the hiragana character'
+                  }
                 </div>
               </div>
 
@@ -334,7 +395,13 @@ const HiraganaEnumerator = () => {
                         handleSubmit();
                       }
                     }}
-                    placeholder={cooldownActive ? "Please wait..." : "Enter romaji..."}
+                    placeholder={
+                      cooldownActive 
+                        ? "Please wait..." 
+                        : gameMode === 'jpToEn' 
+                          ? "Enter romaji (e.g., ka)..." 
+                          : "Enter hiragana (e.g., か)..."
+                    }
                     className={`w-full max-w-md mx-auto text-white text-lg sm:text-xl px-4 sm:px-6 py-3 sm:py-4 rounded-xl border focus:outline-none focus:ring-4 text-center min-h-[44px] transition-all duration-200 ${
                       cooldownActive || isSubmitting
                         ? 'bg-gray-600/40 border-gray-500/50 cursor-not-allowed placeholder-gray-400'
@@ -346,7 +413,25 @@ const HiraganaEnumerator = () => {
                     autoCorrect="off"
                     autoCapitalize="off"
                     spellCheck="false"
+                    lang={gameMode === 'enToJp' ? 'ja' : 'en'}
+                    inputMode={gameMode === 'enToJp' ? 'text' : 'text'}
                   />
+                  
+                  {/* Japanese Input Indicator */}
+                  {gameMode === 'enToJp' && (
+                    <div className="mt-2 text-xs sm:text-sm text-center">
+                      {isJapaneseInput ? (
+                        <span className="text-green-300">✅ Japanese input detected</span>
+                      ) : (
+                        <div className="text-yellow-300">
+                          <span>💡 Switch to Japanese keyboard (JP/あ) to type hiragana</span>
+                          <div className="text-xs mt-1 text-purple-200">
+                            Windows: Win+Space | Mac: Ctrl+Space | Mobile: Globe/🌐 key
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  )}
                 </div>
                 
                 <div className="text-center">
@@ -436,8 +521,22 @@ const HiraganaEnumerator = () => {
                 Welcome to Hiragana Practice!
               </h2>
               <p className="text-base sm:text-lg text-purple-200 mb-4 sm:mb-6">
-                Test your knowledge of all {hiraganaData.length} hiragana characters. Each character will appear exactly once!
+                Test your knowledge of all {hiraganaData.length} hiragana characters in both directions! Each character will appear exactly once.
               </p>
+              <div className="bg-white/10 rounded-xl p-4 mb-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-center">
+                  <div className="p-3 bg-white/10 rounded-lg">
+                    <div className="text-2xl mb-2">🇯🇵 → 🇬🇧</div>
+                    <div className="text-sm text-purple-200">See hiragana, type romaji</div>
+                    <div className="text-xs text-purple-300 mt-1">Example: か → ka</div>
+                  </div>
+                  <div className="p-3 bg-white/10 rounded-lg">
+                    <div className="text-2xl mb-2">🇬🇧 → 🇯🇵</div>
+                    <div className="text-sm text-purple-200">See romaji, type hiragana</div>
+                    <div className="text-xs text-purple-300 mt-1">Example: ka → か</div>
+                  </div>
+                </div>
+              </div>
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 mb-4 sm:mb-6">
                 {hiraganaData.slice(0, 8).map((char, index) => (
                   <div key={index} className="bg-white/10 rounded-lg p-2 sm:p-3 text-center">
@@ -456,9 +555,10 @@ const HiraganaEnumerator = () => {
           <div className="mt-6 sm:mt-8 bg-white/10 backdrop-blur-lg rounded-xl p-4 sm:p-6 border border-white/20">
             <h3 className="text-lg sm:text-xl font-bold text-white mb-3">How to Play:</h3>
             <ul className="text-sm sm:text-base text-purple-200 space-y-2">
-              <li>• A hiragana character will appear on screen</li>
-              <li>• Type the romanized version (e.g., か → ka)</li>
-              <li>• Submit your answer before time runs out</li>
+              <li>• Choose your game mode: Japanese to English or English to Japanese</li>
+              <li>• A character or romaji will appear on screen</li>
+              <li>• Type the correct answer before time runs out</li>
+              <li>• For English → Japanese mode, switch to Japanese keyboard input</li>
               <li>• Complete all {hiraganaData.length} characters to finish the game!</li>
             </ul>
           </div>
